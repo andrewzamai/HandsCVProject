@@ -1,28 +1,61 @@
-// Author: Andrew Zamai
+// Author: Andrew Zamai 2038522
+
 #include "metricsCalculation.hpp"
 
-#include <iostream>
-#include <math.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <iostream>
+#include <math.h>
+#include <exception>
 
 using namespace std;
 using namespace cv;
 
+// Exception to be thrown when groundTruth and image to test  have different sizes
+class MetricsInvalidInputDimension : public exception
+{
+    virtual const char* what() const throw()
+    {
+      return "Inputs of different sizes";
+    }
+}metricsInvInpDim;
+
+// Exception to be thrown when bounding box falls outside the image
+class MetricsOutOfImageBoundingBox : public exception
+{
+    virtual const char* what() const throw()
+    {
+      return "The bounding box falls outside the image";
+    }
+}metricsOutOfImg;
+
+
+/* --------------------------------------------------------------------------------- HAND DETECTION METRICS ---------------------------------------------------------------------------------  */
+
 
 double intersectionOverUnionSingleBB(const Mat& image, vector<int> trueBoundingBox, vector<int> predictedBoundingBox)
 {
+    // True Bounding Box (x, y, width, height) retrieval
     int xTB = trueBoundingBox[0];
     int yTB = trueBoundingBox[1];
     int widthTB = trueBoundingBox[2];
     int heightTB = trueBoundingBox[3];
     
+    // Predicted Bounding Box (x, y, width, height) retrieval
     int xPB = predictedBoundingBox[0];
     int yPB = predictedBoundingBox[1];
     int widthPB = predictedBoundingBox[2];
     int heightPB = predictedBoundingBox[3];
     
-    // TODO: check not out of image?
+    // Checking that bounding boxes are not outside image
+    if(xTB < 0 || yTB < 0 || xTB+widthTB >= image.cols || yTB+heightTB >= image.rows)
+    {
+        throw MetricsOutOfImageBoundingBox();
+    }
+    if(xPB < 0 || yPB < 0 || xPB+widthPB >= image.cols || yPB+heightPB >= image.rows)
+    {
+        throw MetricsOutOfImageBoundingBox();
+    }
     
     // compute Intersection rectangle top left corner coordinates (xA, yA) and top right bottom coordinates (xB, yB)
     int xA = ((xTB - xPB) >= 0) ? xTB : xPB; // max of the two since measured from top left corner
@@ -47,34 +80,55 @@ double intersectionOverUnionSingleBB(const Mat& image, vector<int> trueBoundingB
     return iou;
 }
 
-
-double intersectionOverUnion(const Mat& image, vector<pair<vector<int>,vector<int>>> trueAndPredictedBoundingBoxes)
+/*
+ To determine which Predicted Bounding Box corresponds to which Ground truth bounding box:
+    1) it is computed the IOU score of 1 predicted BB with respect to all possible GT-BBs;
+    2) the IOU for this Predicted BB is the maximum of the computed IOU scores;
+    3) this is done for all predicted BBs and the total IOU score is the sum of all maximum scores
+*/
+double intersectionOverUnion(const Mat& image, vector<vector<int>> trueBoundingBoxes, vector<vector<int>> predictedBoundingBoxes)
 {
     double iouTotal = 0;
-    for(int i=0; i<trueAndPredictedBoundingBoxes.size(); i++)
+    
+    for(int i=0; i<predictedBoundingBoxes.size(); i++)
     {
-        double iou = intersectionOverUnionSingleBB(image, trueAndPredictedBoundingBoxes[i].first, trueAndPredictedBoundingBoxes[i].second);
-        iouTotal += iou;
+        double maxIOU = 0;
+        for(int j=0; j<trueBoundingBoxes.size(); j++)
+        {
+            double score = intersectionOverUnionSingleBB(image, trueBoundingBoxes[j], predictedBoundingBoxes[i]);
+            if(score > maxIOU)
+            {
+                maxIOU = score;
+            }
+        }
+        
+        iouTotal += maxIOU;
     }
     
     return iouTotal;
 }
 
-              
+
+/* --------------------------------------------------------------------------------- HAND SEGMENTATION METRICS ---------------------------------------------------------------------------------  */
+
+
 double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
 {
-    // convert them to GRAYSCALE if not already
-    // TODO: check if already grayscale, check if all went correctly
+    // if different sizes throw Exception
+    if(groundTruthImage.rows != segmentedImage.rows || groundTruthImage.cols != segmentedImage.cols)
+    {
+        throw MetricsInvalidInputDimension();
+    }
+    
+    // since segmented images have 1 color label for each hand we convert them from BGR to GRAYSCALE and consider non-zero pixels as hand-pixels
+    // if not CV_8UC3 cvtColor throws invalid type exception (to be handled in main file)
     Mat groundTruthImageGS;
     cvtColor(groundTruthImage, groundTruthImageGS, COLOR_BGR2GRAY);
-    
     Mat segmentedImageGS;
     cvtColor(segmentedImage, segmentedImageGS, COLOR_BGR2GRAY);
     
-    // we can now assume images are in  Grayscale (uchar type)
-    
-    // number of hand pixels in the segmentedImage that are true hand pixels
-    // means number of non black pixels (since multicolor) that are white in the groundTruthImage image
+    // computing number of hand pixels in the segmentedImage that are true hand pixels
+    // means: number of non black pixels that are 255 in the groundTruthImage image
     int numberTrueHandPixels = 0;
     for(int i=0; i<segmentedImageGS.rows; i++)
     {
@@ -87,7 +141,7 @@ double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
         }
     }
     
-    // number of hand pixel in the segmented image (non black pixels)
+    // number of total hand pixels in the segmented image (non black pixels)
     int numberHandPixelsSI = 0;
     for(int i=0; i<segmentedImageGS.rows; i++)
     {
@@ -100,19 +154,23 @@ double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
         }
     }
     
-    double pixelAccuracyPercent = (static_cast<double>(numberTrueHandPixels)/numberHandPixelsSI) * 100;
+    return (static_cast<double>(numberTrueHandPixels)/numberHandPixelsSI) * 100;
     
-    return pixelAccuracyPercent;
 }
 
 
 double pixelAccuracyNonHand(const Mat& groundTruthImage, const Mat& segmentedImage)
 {
-    // convert them to GRAYSCALE if not already
-    //TODO: check if already grayscale, check if all went correctly
+    // if different sizes throw Exception
+    if(groundTruthImage.rows != segmentedImage.rows || groundTruthImage.cols != segmentedImage.cols)
+    {
+        throw MetricsInvalidInputDimension();
+    }
+    
+    // since segmented images have 1 color label for each hand we convert them from BGR to GRAYSCALE and consider non-zero pixels as hand-pixels
+    // if not CV_8UC3 cvtColor throws invalid type exception (to be handled in main file)
     Mat groundTruthImageGS;
     cvtColor(groundTruthImage, groundTruthImageGS, COLOR_BGR2GRAY);
-    
     Mat segmentedImageGS;
     cvtColor(segmentedImage, segmentedImageGS, COLOR_BGR2GRAY);
     
@@ -142,8 +200,6 @@ double pixelAccuracyNonHand(const Mat& groundTruthImage, const Mat& segmentedIma
         }
     }
     
-    double pixelAccuracyPercent = (static_cast<double>(numberTrueNonHandPixels)/numberNonHandPixelsSI) * 100;
-    
-    return pixelAccuracyPercent;
-
+    return (static_cast<double>(numberTrueNonHandPixels)/numberNonHandPixelsSI) * 100;
+   
 }
