@@ -6,6 +6,7 @@
 #include <opencv2/highgui.hpp>
 #include <stdio.h>
 #include <iostream>
+#include <opencv2/imgproc.hpp>
 
 using namespace cv;
 using namespace std;
@@ -15,7 +16,7 @@ using namespace std;
 int main()
 {
     // IOU TESTING
-    
+    /*
     // Single pair GroundTruth BB - Predicted BB
     vector<int> TBBCoordinates{631, 318, 217, 122};
     vector<int> PBBCoordinates{651, 210, 200, 150};
@@ -37,24 +38,30 @@ int main()
     
     double iouMultiple = intersectionOverUnion(Mat(2000, 2000, CV_8U), trueBoundingBoxes, predictedBoundingBoxes);
     cout << iouMultiple << '\n';
-    
+    */
     // Pixel Accuracy tests for hand segmentation task
     
     String groundTruthImagePath = "../../Miscellanea/MetricsTestImages/07.png";
-    Mat gtImage = imread(groundTruthImagePath);
+    Mat gtImage = imread(groundTruthImagePath, IMREAD_GRAYSCALE);
     namedWindow("GroundTruth Image");
     imshow("GroundTruth Image", gtImage);
     
     String segmentedImagePath = "../../Miscellanea/MetricsTestImages/07Segmented.jpg";
-    Mat segmentedImage = imread(segmentedImagePath);
+    Mat segmentedImage = imread(segmentedImagePath, IMREAD_GRAYSCALE);
     namedWindow("Segmented Image");
     imshow("Segmented Image", segmentedImage);
     
-    double pixelHandAccuracy = pixelAccuracyHand(gtImage, segmentedImage);
-    double pixelNonHandAccuracy = pixelAccuracyNonHand(gtImage, segmentedImage);
+    Mat segmentedImageBGR;
+    cvtColor(segmentedImage, segmentedImageBGR, COLOR_GRAY2BGR);
     
-    cout << pixelHandAccuracy << endl;
-    cout << pixelNonHandAccuracy << endl;
+    
+    double pixelAccuracy = accuracyMetricForSegmentation(gtImage, segmentedImageBGR);
+    double pixelHandPrecision = pixelPrecisionHand(gtImage, segmentedImageBGR);
+    double pixelNonHandPrecision = pixelPrecisionNonHand(gtImage, segmentedImageBGR);
+    
+    cout << "Pixel accuracy: " << pixelAccuracy << endl;
+    cout << "Hand pixels precision: " << pixelHandPrecision << endl;
+    cout << "Non Hand pixels precision: " << pixelNonHandPrecision << endl;
     
     waitKey(0);
 

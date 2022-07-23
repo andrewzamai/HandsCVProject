@@ -28,22 +28,33 @@ double intersectionOverUnion(const cv::Mat& image, std::vector<std::vector<int>>
 
 
 /**
+ Accuracy metric for hands segmentation task computed as
+ (n° of hand pixels classified as hand + n° of non-hand pixels classified as non-hand)/(total n° of pixels)
+ 
+ @param groundTruthImage ground truth segmented image of CV_8UC1 type
+ @param segmentedImage segmented image to test of CV_8UC3 type
+ @return accuracy score
+*/
+double accuracyMetricForSegmentation(const cv::Mat& groundTruthImage, const cv::Mat& segmentedImage);
+
+
+/**
  Computes percent of pixels of class Hand that are correctly classified.
  
- @param groundTruthImage ground truth segmented image of CV_8UC3 type
+ @param groundTruthImage ground truth segmented image of CV_8UC1 type
  @param segmentedImage segmented image to test of CV_8UC3 type
  @return percent of correctly classified pixels
 */
-double pixelAccuracyHand(const cv::Mat& groundTruthImage, const cv::Mat& segmentedImage);
+double pixelPrecisionHand(const cv::Mat& groundTruthImage, const cv::Mat& segmentedImage);
 
 /**
  Computes percent of pixels of class Non-hand that are correctly classified.
  
- @param groundTruthImage ground truth segmented image CV_8UC3 type
+ @param groundTruthImage ground truth segmented image CV_8UC1 type
  @param segmentedImage segmented image to test CV_8UC3 type
- @return percent of correctly classified pixels
+ @return percent of correctly classified pixels an non hand
 */
-double pixelAccuracyNonHand(const cv::Mat& groundTruthImage, const cv::Mat& segmentedImage);
+double pixelPrecisionNonHand(const cv::Mat& groundTruthImage, const cv::Mat& segmentedImage);
 
 
 #endif

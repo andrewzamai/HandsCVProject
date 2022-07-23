@@ -30,7 +30,7 @@ class MetricsOutOfImageBoundingBox : public exception
 }metricsOutOfImg;
 
 
-/* --------------------------------------------------------------------------------- HAND DETECTION METRICS ---------------------------------------------------------------------------------  */
+/* ------------------------------------- HANDS DETECTION METRICS ------------------------------------- */
 
 
 double intersectionOverUnionSingleBB(const Mat& image, vector<int> trueBoundingBox, vector<int> predictedBoundingBox)
@@ -109,10 +109,10 @@ double intersectionOverUnion(const Mat& image, vector<vector<int>> trueBoundingB
 }
 
 
-/* --------------------------------------------------------------------------------- HAND SEGMENTATION METRICS ---------------------------------------------------------------------------------  */
+/* ------------------------------------- HAND SEGMENTATION METRICS -------------------------------------  */
 
 
-double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
+double accuracyMetricForSegmentation(const Mat& groundTruthImage, const Mat& segmentedImage)
 {
     // if different sizes throw Exception
     if(groundTruthImage.rows != segmentedImage.rows || groundTruthImage.cols != segmentedImage.cols)
@@ -122,8 +122,43 @@ double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
     
     // since segmented images have 1 color label for each hand we convert them from BGR to GRAYSCALE and consider non-zero pixels as hand-pixels
     // if not CV_8UC3 cvtColor throws invalid type exception (to be handled in main file)
-    Mat groundTruthImageGS;
-    cvtColor(groundTruthImage, groundTruthImageGS, COLOR_BGR2GRAY);
+    Mat segmentedImageGS;
+    cvtColor(segmentedImage, segmentedImageGS, COLOR_BGR2GRAY);
+    
+    int trueHandPixels = 0;
+    int trueNonHandPixels = 0;
+    for(int i=0; i<segmentedImageGS.rows; i++)
+    {
+        for(int j=0; j<segmentedImageGS.cols; j++)
+        {
+            if(segmentedImageGS.at<uchar>(i,j) != 0 && groundTruthImage.at<uchar>(i,j) == 255)
+            {
+                trueHandPixels++;
+            }
+            if(segmentedImageGS.at<uchar>(i,j) == 0 && groundTruthImage.at<uchar>(i,j) == 0)
+            {
+                trueNonHandPixels++;
+            }
+        }
+    }
+    
+    int numberTotPixels = segmentedImageGS.rows * segmentedImageGS.cols;
+    
+    return (static_cast<double>(trueHandPixels + trueNonHandPixels)/numberTotPixels);
+}
+
+// other usefull segmentation metrics
+
+double pixelPrecisionHand(const Mat& groundTruthImage, const Mat& segmentedImage)
+{
+    // if different sizes throw Exception
+    if(groundTruthImage.rows != segmentedImage.rows || groundTruthImage.cols != segmentedImage.cols)
+    {
+        throw MetricsInvalidInputDimension();
+    }
+    
+    // since segmented images have 1 color label for each hand we convert them from BGR to GRAYSCALE and consider non-zero pixels as hand-pixels
+    // if not CV_8UC3 cvtColor throws invalid type exception (to be handled in main file)
     Mat segmentedImageGS;
     cvtColor(segmentedImage, segmentedImageGS, COLOR_BGR2GRAY);
     
@@ -134,7 +169,7 @@ double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
     {
         for(int j=0; j<segmentedImageGS.cols; j++)
         {
-            if(segmentedImageGS.at<uchar>(i,j) != 0 && groundTruthImageGS.at<uchar>(i,j) == 255)
+            if(segmentedImageGS.at<uchar>(i,j) != 0 && groundTruthImage.at<uchar>(i,j) == 255)
             {
                 numberTrueHandPixels++;
             }
@@ -159,7 +194,7 @@ double pixelAccuracyHand(const Mat& groundTruthImage, const Mat& segmentedImage)
 }
 
 
-double pixelAccuracyNonHand(const Mat& groundTruthImage, const Mat& segmentedImage)
+double pixelPrecisionNonHand(const Mat& groundTruthImage, const Mat& segmentedImage)
 {
     // if different sizes throw Exception
     if(groundTruthImage.rows != segmentedImage.rows || groundTruthImage.cols != segmentedImage.cols)
@@ -169,8 +204,6 @@ double pixelAccuracyNonHand(const Mat& groundTruthImage, const Mat& segmentedIma
     
     // since segmented images have 1 color label for each hand we convert them from BGR to GRAYSCALE and consider non-zero pixels as hand-pixels
     // if not CV_8UC3 cvtColor throws invalid type exception (to be handled in main file)
-    Mat groundTruthImageGS;
-    cvtColor(groundTruthImage, groundTruthImageGS, COLOR_BGR2GRAY);
     Mat segmentedImageGS;
     cvtColor(segmentedImage, segmentedImageGS, COLOR_BGR2GRAY);
     
@@ -180,7 +213,7 @@ double pixelAccuracyNonHand(const Mat& groundTruthImage, const Mat& segmentedIma
     {
         for(int j=0; j<segmentedImageGS.cols; j++)
         {
-            if(segmentedImageGS.at<uchar>(i,j) == 0 && groundTruthImageGS.at<uchar>(i,j) == 0)
+            if(segmentedImageGS.at<uchar>(i,j) == 0 && groundTruthImage.at<uchar>(i,j) == 0)
             {
                 numberTrueNonHandPixels++;
             }
@@ -201,5 +234,4 @@ double pixelAccuracyNonHand(const Mat& groundTruthImage, const Mat& segmentedIma
     }
     
     return (static_cast<double>(numberTrueNonHandPixels)/numberNonHandPixelsSI) * 100;
-   
 }
