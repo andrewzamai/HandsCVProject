@@ -56,7 +56,11 @@ void segmentImages(const vector<Mat>& inImages, vector<Mat>& outImages)
     // calling the python script passing the number of images to be segmented
     // by convention the names of the passsed images are the number in the range (0, numberOfImages).jpg
     int numberOfImages = inImages.size();
+<<<<<<< HEAD
     string command = string("python3 ../src/segmentation/segmentImageUnetModel.py segmentAllImages ") + to_string(numberOfImages);
+=======
+    string command = string("python3 segmentImageUnetModel.py segmentAllImages ") + to_string(numberOfImages);
+>>>>>>> 1ed1223fec1615db5fa109c067a6bbaf57c0a080
     
     try {
         system(command.c_str());
